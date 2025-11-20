@@ -1,0 +1,16 @@
+{
+  "name": "lifecycle-backend",
+  "version": "0.1.0",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.8.1",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "node-cron": "^4.2.1",
+    "nodemailer": "^6.9.16"
+  }
+}
