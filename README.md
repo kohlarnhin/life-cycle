@@ -26,13 +26,14 @@ cd life-cycle
 # 安装所有依赖
 npm run install:all
 
-# 同时启动前后端（方式1：使用 concurrently）
+# 方式1：前台启动（开发环境，可以看到实时日志）
 npm run dev
 
-# 或使用 Shell 脚本（方式2：备选方案）
-npm run dev:sh
-# 或直接运行
-./start.sh
+# 方式2：后台启动（生产环境，服务在后台运行）
+./start-daemon.sh
+
+# 停止后台服务
+./stop.sh
 ```
 
 ### 访问应用
@@ -54,13 +55,41 @@ npm run dev:backend
 npm run dev:frontend
 ```
 
+### 后台运行（生产环境）
+
+使用后台启动脚本，服务会在后台持续运行：
+
+```bash
+# 启动服务（后台运行）
+./start-daemon.sh
+
+# 查看日志
+tail -f logs/backend.log   # 后端日志
+tail -f logs/frontend.log  # 前端日志
+
+# 停止服务
+./stop.sh
+```
+
+**特点**：
+- ✅ 服务在后台运行，退出终端不影响
+- ✅ 日志自动保存到 `logs/` 目录
+- ✅ 自动管理进程 PID
+- ✅ 支持重启（会先停止旧进程）
+
 ### 故障排除
 
 **问题：`concurrently: not found`**
 
 解决方案：
 1. 在根目录运行 `npm install` 安装 concurrently
-2. 或使用备选启动方式：`npm run dev:sh` 或 `./start.sh`
+2. 或使用后台启动：`./start-daemon.sh`
+
+**问题：`spawn xdg-open ENOENT`**
+
+解决方案：
+- 这是自动打开浏览器的错误，不影响服务运行
+- 已修复：关闭了自动打开浏览器功能
 
 ## 📁 项目结构
 
