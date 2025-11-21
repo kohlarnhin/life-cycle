@@ -23,21 +23,31 @@
 git clone https://github.com/kohlarnhin/life-cycle.git
 cd life-cycle
 
-# 启动后端服务
-cd backend
-npm install
-npm start
+# 安装所有依赖
+npm run install:all
 
-# 新开终端，启动前端服务
-cd frontend
-npm install
+# 同时启动前后端
 npm run dev
 ```
 
 ### 访问应用
 
-- 前端应用：http://localhost:5173
-- 后端 API：http://localhost:3000/api
+- 应用地址：http://localhost:5173
+- 局域网访问：http://[你的IP]:5173
+
+**注意**：前端已配置代理，所有 `/api` 请求会自动转发到后端服务，无需暴露后端端口。
+
+### 分别启动（可选）
+
+如需分别启动前后端：
+
+```bash
+# 启动后端
+npm run dev:backend
+
+# 启动前端
+npm run dev:frontend
+```
 
 ## 📁 项目结构
 

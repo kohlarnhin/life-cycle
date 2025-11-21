@@ -1,0 +1,24 @@
+{
+  "name": "life-cycle",
+  "version": "1.0.0",
+  "description": "生活效期管理系统",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && node server.js",
+    "dev:frontend": "cd frontend && npm run dev",
+    "install:all": "cd backend && npm install && cd ../frontend && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": [
+    "lifecycle",
+    "habit",
+    "reminder",
+    "email"
+  ],
+  "author": "kohlarnhin",
+  "license": "MIT"
+}
+
