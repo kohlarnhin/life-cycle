@@ -26,8 +26,13 @@ cd life-cycle
 # 安装所有依赖
 npm run install:all
 
-# 同时启动前后端
+# 同时启动前后端（方式1：使用 concurrently）
 npm run dev
+
+# 或使用 Shell 脚本（方式2：备选方案）
+npm run dev:sh
+# 或直接运行
+./start.sh
 ```
 
 ### 访问应用
@@ -45,9 +50,17 @@ npm run dev
 # 启动后端
 npm run dev:backend
 
-# 启动前端
+# 启动前端（新开终端）
 npm run dev:frontend
 ```
+
+### 故障排除
+
+**问题：`concurrently: not found`**
+
+解决方案：
+1. 在根目录运行 `npm install` 安装 concurrently
+2. 或使用备选启动方式：`npm run dev:sh` 或 `./start.sh`
 
 ## 📁 项目结构
 
