@@ -4,7 +4,7 @@ import { motion } from 'motion/react';
 import { Button } from './ui/button';
 
 interface Habit {
-  id: string;
+  id: number;
   title: string;
   duration: number;
   startDate: Date;
@@ -12,30 +12,28 @@ interface Habit {
 
 interface HabitCardProps {
   habit: Habit;
-  onReset: (id: string) => void;
-  onDelete: (id: string) => void;
+  onReset: (id: number) => void;
+  onDelete: (id: number) => void;
   index: number;
 }
 
 export function HabitCard({ habit, onReset, onDelete, index }: HabitCardProps) {
   const [isPressed, setIsPressed] = useState(false);
   
-  // 计算剩余天数
-  const getDaysRemaining = () => {
-    const now = new Date();
-    const elapsed = Math.floor((now.getTime() - habit.startDate.getTime()) / (1000 * 60 * 60 * 24));
-    const remaining = habit.duration - elapsed;
-    return Math.max(0, remaining);
-  };
+  // 计算进度与剩余/过期天数（以天为单位）
+  const now = new Date();
+  const elapsedDays = Math.floor(
+    (now.getTime() - habit.startDate.getTime()) / (1000 * 60 * 60 * 24),
+  );
+  const remainingRaw = habit.duration - elapsedDays;
+  const isExpired = remainingRaw < 0;
+  const expiredDays = isExpired ? -remainingRaw : 0;
+  const daysRemaining = Math.max(0, remainingRaw);
 
-  // 计算进度百分比（剩余时间占总时间的百分比）
-  const getProgress = () => {
-    const remaining = getDaysRemaining();
-    return (remaining / habit.duration) * 100;
-  };
-
-  const daysRemaining = getDaysRemaining();
-  const progress = getProgress();
+  // 剩余百分比（用于进度环）；已过期视为 0%
+  const progress = habit.duration > 0
+    ? Math.max(0, Math.min(100, (daysRemaining / habit.duration) * 100))
+    : 0;
 
   // 获取状态信息
   const getStatusInfo = () => {
@@ -152,15 +150,23 @@ export function HabitCard({ habit, onReset, onDelete, index }: HabitCardProps) {
             {/* 效期信息 - 单行显示，不换行 */}
             <div className="flex items-baseline gap-1 whitespace-nowrap">
               <motion.span 
-                key={daysRemaining}
+                key={isExpired ? `expired-${expiredDays}` : `remain-${daysRemaining}`}
                 initial={{ scale: 1.2 }}
                 animate={{ scale: 1 }}
                 className={`${statusInfo.numColor} text-[15px]`}
               >
-                {statusInfo.showDaysRemaining ? daysRemaining : habit.duration}
+                {isExpired
+                  ? expiredDays
+                  : statusInfo.showDaysRemaining
+                    ? daysRemaining
+                    : habit.duration}
               </motion.span>
               <span className="text-gray-500 text-[13px]">
-                {statusInfo.showDaysRemaining ? '天剩余' : '天效期'}
+                {isExpired
+                  ? '天已过期'
+                  : statusInfo.showDaysRemaining
+                    ? '天剩余'
+                    : '天效期'}
               </span>
             </div>
           </div>

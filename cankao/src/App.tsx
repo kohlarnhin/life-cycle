@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus, X, Check, List, Mail } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { HabitCard } from './components/HabitCard';
@@ -7,190 +7,298 @@ import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
 
 interface Habit {
-  id: string;
+  id: number;
   title: string;
   duration: number;
   startDate: Date;
-  categoryId: string;
+  categoryId: number;
 }
 
 interface Category {
-  id: string;
+  id: number;
   name: string;
+  habitCount?: number;
 }
+
+interface HabitDTO {
+  id: number;
+  title: string;
+  duration: number;
+  startDate: string; // yyyy-MM-dd
+  categoryId: number;
+}
+
+const API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:3000/api`;
+const PAGE_SIZE = 10;
 
 export default function App() {
   const [currentView, setCurrentView] = useState<'list' | 'settings'>('list');
   
-  const [categories, setCategories] = useState<Category[]>([
-    { id: 'clothing', name: '衣物' },
-    { id: 'cleaning', name: '清洁' },
-    { id: 'kitchen', name: '厨房' },
-    { id: 'health', name: '健康' },
-  ]);
+  const [categories, setCategories] = useState<Category[]>([]);
   
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   
-  const [habits, setHabits] = useState<Habit[]>([
-    {
-      id: '1',
-      title: '晒被子',
-      duration: 14,
-      startDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-      categoryId: 'clothing',
-    },
-    {
-      id: '2',
-      title: '洗鞋子',
-      duration: 30,
-      startDate: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000),
-      categoryId: 'clothing',
-    },
-    {
-      id: '3',
-      title: '洗毯子',
-      duration: 60,
-      startDate: new Date(Date.now() - 61 * 24 * 60 * 60 * 1000),
-      categoryId: 'clothing',
-    },
-    {
-      id: '4',
-      title: '洗窗帘',
-      duration: 90,
-      startDate: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000),
-      categoryId: 'clothing',
-    },
-    {
-      id: '5',
-      title: '消杀',
-      duration: 7,
-      startDate: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000),
-      categoryId: 'cleaning',
-    },
-    {
-      id: '6',
-      title: '扫地拖地',
-      duration: 3,
-      startDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-      categoryId: 'cleaning',
-    },
-    {
-      id: '7',
-      title: '清洁空调滤网',
-      duration: 90,
-      startDate: new Date(Date.now() - 92 * 24 * 60 * 60 * 1000),
-      categoryId: 'cleaning',
-    },
-    {
-      id: '8',
-      title: '清洁油烟机',
-      duration: 30,
-      startDate: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
-      categoryId: 'kitchen',
-    },
-    {
-      id: '9',
-      title: '清洁冰箱',
-      duration: 14,
-      startDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-      categoryId: 'kitchen',
-    },
-    {
-      id: '10',
-      title: '更换洗碗布',
-      duration: 7,
-      startDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-      categoryId: 'kitchen',
-    },
-    {
-      id: '11',
-      title: '体检',
-      duration: 365,
-      startDate: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000),
-      categoryId: 'health',
-    },
-    {
-      id: '12',
-      title: '更换牙刷',
-      duration: 90,
-      startDate: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000),
-      categoryId: 'health',
-    },
-  ]);
+  const [habits, setHabits] = useState<Habit[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   
   const [isAdding, setIsAdding] = useState(false);
   const [newHabitTitle, setNewHabitTitle] = useState('');
   const [newHabitDuration, setNewHabitDuration] = useState('21');
-  const [newHabitCategory, setNewHabitCategory] = useState<string>(categories[0]?.id || '');
+  const [newHabitCategory, setNewHabitCategory] = useState<string>('');
 
-  const handleAddHabit = () => {
+  // 加载分类数据
+  const fetchCategories = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/categories`);
+      const categoriesData: Category[] = await res.json();
+      setCategories(categoriesData);
+
+      if (!newHabitCategory && categoriesData.length > 0) {
+        setNewHabitCategory(String(categoriesData[0].id));
+      }
+    } catch (error) {
+      console.error('加载分组失败', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  // 加载习惯数据
+  const fetchHabits = async (
+    categoryId: string,
+    pageToLoad: number,
+    replace = false,
+  ) => {
+    try {
+      setIsLoading(true);
+
+      const params = new URLSearchParams();
+      params.set('page', String(pageToLoad));
+      params.set('pageSize', String(PAGE_SIZE));
+      if (categoryId !== 'all') {
+        params.set('categoryId', categoryId);
+      }
+
+      const res = await fetch(`${API_BASE_URL}/habits?${params.toString()}`);
+      if (!res.ok) {
+        console.error('加载内容失败');
+        return;
+      }
+
+      const habitsData: HabitDTO[] = await res.json();
+      const mapped = habitsData.map((h) => ({
+        ...h,
+        startDate: new Date(`${h.startDate}T00:00:00`),
+      }));
+
+      setHabits((prev) => (replace ? mapped : [...prev, ...mapped]));
+      setHasMore(habitsData.length === PAGE_SIZE);
+      setPage(pageToLoad);
+    } catch (error) {
+      console.error('加载内容失败', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    setHabits([]);
+    setPage(1);
+    setHasMore(true);
+    fetchHabits(activeCategory, 1, true);
+  }, [activeCategory]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (isLoading || !hasMore) return;
+
+      const scrollTop = window.scrollY || window.pageYOffset;
+      const windowHeight = window.innerHeight;
+      const docHeight = document.documentElement.scrollHeight;
+
+      if (docHeight - (scrollTop + windowHeight) < 200) {
+        fetchHabits(activeCategory, page + 1);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [isLoading, hasMore, page, activeCategory]);
+
+  const handleAddHabit = async () => {
     if (newHabitTitle.trim() && newHabitDuration && newHabitCategory) {
-      const newHabit: Habit = {
-        id: Date.now().toString(),
+      try {
+        const res = await fetch(`${API_BASE_URL}/habits`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
         title: newHabitTitle.trim(),
-        duration: parseInt(newHabitDuration),
-        startDate: new Date(),
-        categoryId: newHabitCategory,
-      };
-      setHabits([...habits, newHabit]);
+            duration: parseInt(newHabitDuration, 10),
+            categoryId: Number(newHabitCategory),
+          }),
+        });
+
+        if (!res.ok) {
+          console.error('创建内容失败');
+          return;
+        }
+
+        const created: HabitDTO = await res.json();
+        setHabits([
+          ...habits,
+          {
+            ...created,
+            startDate: new Date(`${created.startDate}T00:00:00`),
+          },
+        ]);
+
+        fetchCategories();
+
       setNewHabitTitle('');
       setNewHabitDuration('21');
-      setNewHabitCategory(categories[0]?.id || '');
+        if (categories.length > 0) {
+          setNewHabitCategory(String(categories[0].id));
+        }
       setIsAdding(false);
+      } catch (error) {
+        console.error('创建内容失败', error);
+      }
     }
   };
 
   const handleCancel = () => {
     setNewHabitTitle('');
     setNewHabitDuration('21');
-    setNewHabitCategory(categories[0]?.id || '');
+    if (categories.length > 0) {
+      setNewHabitCategory(String(categories[0].id));
+    } else {
+      setNewHabitCategory('');
+    }
     setIsAdding(false);
     setIsAddingCategory(false);
     setNewCategoryName('');
   };
 
-  const handleReset = (id: string) => {
-    setHabits(habits.map(habit => 
+  const handleReset = async (id: number) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/habits/${id}/reset`, {
+        method: 'POST',
+      });
+
+      if (!res.ok) {
+        console.error('重置内容失败');
+        return;
+      }
+
+      const updated: HabitDTO = await res.json();
+      setHabits(
+        habits.map((habit) =>
       habit.id === id 
-        ? { ...habit, startDate: new Date() }
-        : habit
-    ));
-  };
-
-  const handleDelete = (id: string) => {
-    setHabits(habits.filter(habit => habit.id !== id));
-  };
-
-  const handleAddCategory = () => {
-    if (newCategoryName.trim()) {
-      const newCategory: Category = {
-        id: Date.now().toString(),
-        name: newCategoryName.trim(),
-      };
-      setCategories([...categories, newCategory]);
-      setNewCategoryName('');
-      setIsAddingCategory(false);
+            ? {
+              ...updated,
+              startDate: new Date(`${updated.startDate}T00:00:00`),
+            }
+            : habit,
+        ),
+      );
+    } catch (error) {
+      console.error('重置内容失败', error);
     }
   };
 
-  const handleDeleteCategory = (categoryId: string) => {
-    setCategories(categories.filter(cat => cat.id !== categoryId));
-    setHabits(habits.filter(habit => habit.categoryId !== categoryId));
+  const handleDelete = async (id: number) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/habits/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (!res.ok && res.status !== 404) {
+        console.error('删除内容失败');
+        return;
+      }
+
+      setHabits(habits.filter((habit) => habit.id !== id));
+      fetchCategories();
+    } catch (error) {
+      console.error('删除内容失败', error);
+    }
+  };
+
+  const handleAddCategory = async () => {
+    if (newCategoryName.trim()) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/categories`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ name: newCategoryName.trim() }),
+        });
+
+        if (!res.ok) {
+          console.error('创建分组失败');
+          return;
+        }
+
+        const created: Category = await res.json();
+        setCategories([...categories, created]);
+      setNewCategoryName('');
+      setIsAddingCategory(false);
+
+        if (!newHabitCategory) {
+          setNewHabitCategory(String(created.id));
+        }
+      } catch (error) {
+        console.error('创建分组失败', error);
+      }
+    }
+  };
+
+  const handleDeleteCategory = async (categoryId: string) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/categories/${categoryId}`, {
+        method: 'DELETE',
+      });
+
+      if (!res.ok && res.status !== 404) {
+        console.error('删除分组失败');
+        return;
+      }
+
+      const catIdNum = Number(categoryId);
+      const newCategories = categories.filter((cat) => cat.id !== catIdNum);
+      setCategories(newCategories);
+      setHabits(habits.filter((habit) => habit.categoryId !== catIdNum));
+
     if (activeCategory === categoryId) {
       setActiveCategory('all');
     }
-  };
 
-  const getFilteredHabits = () => {
-    if (activeCategory === 'all') {
-      return habits;
+      if (newHabitCategory === categoryId) {
+        if (newCategories.length > 0) {
+          setNewHabitCategory(String(newCategories[0].id));
+        } else {
+          setNewHabitCategory('');
+        }
+      }
+    } catch (error) {
+      console.error('删除分组失败', error);
     }
-    return habits.filter(habit => habit.categoryId === activeCategory);
   };
 
-  const filteredHabits = getFilteredHabits();
+  const filteredHabits = habits;
+  const totalHabitCount = categories.reduce(
+    (sum, category) => sum + (category.habitCount ?? 0),
+    0,
+  );
 
   return (
     <div className="h-screen flex flex-col bg-white overflow-hidden">
@@ -255,28 +363,28 @@ export default function App() {
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
-                全部 ({habits.length})
+                全部 ({totalHabitCount})
               </motion.button>
               
               {categories.map((category) => (
                 <div key={category.id} className="relative group pt-1 pr-1">
                   <motion.button
                     whileTap={{ scale: 0.95 }}
-                    onClick={() => setActiveCategory(category.id)}
+                    onClick={() => setActiveCategory(String(category.id))}
                     className={`px-4 py-2 rounded-full transition-all whitespace-nowrap ${
-                      activeCategory === category.id
+                      activeCategory === String(category.id)
                         ? 'bg-gray-900 text-white'
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                   >
-                    {category.name} ({habits.filter(h => h.categoryId === category.id).length})
+                    {category.name} ({category.habitCount ?? 0})
                   </motion.button>
                   
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       if (confirm(`确定删除分组"${category.name}"及其所有内容吗？`)) {
-                        handleDeleteCategory(category.id);
+                        handleDeleteCategory(String(category.id));
                       }
                     }}
                     className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10"
