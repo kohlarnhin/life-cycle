@@ -14,7 +14,7 @@ interface EmailConfig {
   toEmail: string;
 }
 
-const API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:3000/api`;
+const API_BASE_URL = '/api';
 
 export function Settings() {
   const [smtpConfig, setSmtpConfig] = useState({

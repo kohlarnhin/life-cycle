@@ -28,7 +28,7 @@ interface HabitDTO {
   categoryId: number;
 }
 
-const API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:3000/api`;
+const API_BASE_URL = '/api';
 const PAGE_SIZE = 10;
 
 export default function App() {
