@@ -54,12 +54,12 @@
       outDir: 'build',
     },
     server: {
-      port: 5173,
+      port: 3100,
       host: '0.0.0.0',
       open: false,
       proxy: {
         '/api': {
-          target: 'http://localhost:3000',
+          target: 'http://localhost:3101',
           changeOrigin: true,
         },
       },

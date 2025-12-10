@@ -9,7 +9,7 @@ const cron = require('node-cron');
 const db = require('./db');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3101;
 const DEFAULT_PAGE_SIZE = 10;
 const MAX_PAGE_SIZE = 100;
 
@@ -26,9 +26,22 @@ function buildExpiredEmailContent(expiredList) {
 app.use(cors());
 app.use(express.json());
 
+// 统一响应格式
+const success = (data, message = '操作成功') => ({
+  code: 0,
+  message,
+  data
+});
+
+const error = (message, code = -1) => ({
+  code,
+  message,
+  data: null
+});
+
 // 健康检查
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok' });
+  res.json(success({ status: 'ok' }));
 });
 
 // 分组相关接口
@@ -37,10 +50,10 @@ app.get('/api/health', (req, res) => {
 app.get('/api/categories', (req, res) => {
   try {
     const categories = db.getAllCategories();
-    res.json(categories);
-  } catch (error) {
-    console.error('获取分组失败', error);
-    res.status(500).json({ message: '获取分组失败' });
+    res.json(success(categories, '获取分组成功'));
+  } catch (err) {
+    console.error('获取分组失败', err);
+    res.status(500).json(error('获取分组失败'));
   }
 });
 
@@ -49,14 +62,14 @@ app.post('/api/categories', (req, res) => {
   try {
     const { name } = req.body;
     if (!name || typeof name !== 'string') {
-      return res.status(400).json({ message: '分组名称不能为空' });
+      return res.status(400).json(error('分组名称不能为空'));
     }
 
     const category = db.createCategory(name.trim());
-    res.status(201).json(category);
-  } catch (error) {
-    console.error('创建分组失败', error);
-    res.status(500).json({ message: '创建分组失败' });
+    res.status(201).json(success(category, '创建分组成功'));
+  } catch (err) {
+    console.error('创建分组失败', err);
+    res.status(500).json(error('创建分组失败'));
   }
 });
 
@@ -66,12 +79,12 @@ app.delete('/api/categories/:id', (req, res) => {
     const { id } = req.params;
     const deleted = db.deleteCategory(id);
     if (!deleted) {
-      return res.status(404).json({ message: '分组不存在' });
+      return res.status(404).json(error('分组不存在'));
     }
-    res.status(204).send();
-  } catch (error) {
-    console.error('删除分组失败', error);
-    res.status(500).json({ message: '删除分组失败' });
+    res.json(success(null, '删除分组成功'));
+  } catch (err) {
+    console.error('删除分组失败', err);
+    res.status(500).json(error('删除分组失败'));
   }
 });
 
@@ -102,10 +115,10 @@ app.get('/api/habits', (req, res) => {
       pageSize,
     });
 
-    res.json(habits);
-  } catch (error) {
-    console.error('获取事项列表失败', error);
-    res.status(500).json({ message: '获取事项列表失败' });
+    res.json(success(habits, '获取事项列表成功'));
+  } catch (err) {
+    console.error('获取事项列表失败', err);
+    res.status(500).json(error('获取事项列表失败'));
   }
 });
 
@@ -113,10 +126,10 @@ app.get('/api/habits', (req, res) => {
 app.get('/api/email-config', (req, res) => {
   try {
     const settings = db.getEmailSettings();
-    res.json(settings || {});
-  } catch (error) {
-    console.error('获取邮件配置失败', error);
-    res.status(500).json({ message: '获取邮件配置失败' });
+    res.json(success(settings || {}, '获取邮件配置成功'));
+  } catch (err) {
+    console.error('获取邮件配置失败', err);
+    res.status(500).json(error('获取邮件配置失败'));
   }
 });
 
@@ -126,7 +139,7 @@ app.post('/api/email-config', (req, res) => {
     const { host, port, secure, user, pass, fromAddr, toAddr } = req.body || {};
 
     if (!host || !port || !fromAddr || !toAddr) {
-      return res.status(400).json({ message: 'host、port、发件人、收件人不能为空' });
+      return res.status(400).json(error('host、port、发件人、收件人不能为空'));
     }
 
     const saved = db.saveEmailSettings({
@@ -139,10 +152,10 @@ app.post('/api/email-config', (req, res) => {
       toAddr,
     });
 
-    res.json(saved);
-  } catch (error) {
-    console.error('保存邮件配置失败', error);
-    res.status(500).json({ message: '保存邮件配置失败' });
+    res.json(success(saved, '保存邮件配置成功'));
+  } catch (err) {
+    console.error('保存邮件配置失败', err);
+    res.status(500).json(error('保存邮件配置失败'));
   }
 });
 
@@ -151,17 +164,17 @@ app.post('/api/email-test', async (req, res) => {
   try {
     const settings = db.getEmailSettings();
     if (!settings) {
-      return res.status(400).json({ message: '请先配置邮件发送信息' });
+      return res.status(400).json(error('请先配置邮件发送信息'));
     }
 
     const { host, port, secure, user, pass, fromAddr, toAddr } = settings;
     if (!host || !port || !fromAddr || !toAddr) {
-      return res.status(400).json({ message: '邮件配置不完整，请检查 host/port/from/to' });
+      return res.status(400).json(error('邮件配置不完整，请检查 host/port/from/to'));
     }
 
     const expiredList = db.getExpiredHabits();
     if (!expiredList || expiredList.length === 0) {
-      return res.status(200).json({ message: '当前没有已过期的内容' });
+      return res.status(200).json(success(null, '当前没有已过期的内容'));
     }
 
     // 配置日志输出以便调试
@@ -223,10 +236,7 @@ app.post('/api/email-test', async (req, res) => {
       console.log('SMTP 连接验证成功');
     } catch (verifyError) {
       console.error('SMTP 连接验证失败:', verifyError);
-      return res.status(500).json({ 
-        message: 'SMTP 连接失败，请检查服务器地址、端口和认证信息', 
-        error: verifyError.message 
-      });
+      return res.status(500).json(error('SMTP 连接失败，请检查服务器地址、端口和认证信息'));
     }
 
     const mailOptions = {
@@ -240,10 +250,10 @@ app.post('/api/email-test', async (req, res) => {
     const info = await transporter.sendMail(mailOptions);
     console.log('邮件发送成功:', info.messageId);
 
-    res.json({ message: '测试邮件已发送', count: expiredList.length });
-  } catch (error) {
-    console.error('发送测试邮件失败', error);
-    res.status(500).json({ message: '发送测试邮件失败', error: error.message || String(error) });
+    res.json(success({ count: expiredList.length }, '测试邮件已发送'));
+  } catch (err) {
+    console.error('发送测试邮件失败', err);
+    res.status(500).json(error('发送测试邮件失败'));
   }
 });
 
@@ -253,28 +263,29 @@ app.post('/api/habits', (req, res) => {
     const { title, duration, categoryId } = req.body;
 
     if (!title || typeof title !== 'string') {
-      return res.status(400).json({ message: '内容名称不能为空' });
+      return res.status(400).json(error('内容名称不能为空'));
     }
 
     const durationNumber = Number(duration);
     if (!durationNumber || !Number.isFinite(durationNumber) || durationNumber <= 0) {
-      return res.status(400).json({ message: '效期天数必须为大于 0 的数字' });
+      return res.status(400).json(error('效期天数必须为大于 0 的数字'));
     }
 
-    if (!categoryId || typeof categoryId !== 'string') {
-      return res.status(400).json({ message: '分组不能为空' });
+    // 支持字符串或数字类型的 categoryId
+    if (categoryId === undefined || categoryId === null || categoryId === '') {
+      return res.status(400).json(error('分组不能为空'));
     }
 
     const habit = db.createHabit({
       title: title.trim(),
       duration: durationNumber,
-      categoryId
+      categoryId: String(categoryId)
     });
 
-    res.status(201).json(habit);
-  } catch (error) {
-    console.error('创建事项失败', error);
-    res.status(500).json({ message: '创建事项失败' });
+    res.status(201).json(success(habit, '创建事项成功'));
+  } catch (err) {
+    console.error('创建事项失败', err);
+    res.status(500).json(error('创建事项失败'));
   }
 });
 
@@ -284,12 +295,48 @@ app.post('/api/habits/:id/reset', (req, res) => {
     const { id } = req.params;
     const habit = db.resetHabitStartDate(id);
     if (!habit) {
-      return res.status(404).json({ message: '事项不存在' });
+      return res.status(404).json(error('事项不存在'));
     }
-    res.json(habit);
-  } catch (error) {
-    console.error('重置事项失败', error);
-    res.status(500).json({ message: '重置事项失败' });
+    res.json(success(habit, '重置事项成功'));
+  } catch (err) {
+    console.error('重置事项失败', err);
+    res.status(500).json(error('重置事项失败'));
+  }
+});
+
+// 编辑事项
+app.put('/api/habits/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, duration, categoryId } = req.body;
+
+    if (!title || typeof title !== 'string') {
+      return res.status(400).json(error('内容名称不能为空'));
+    }
+
+    const durationNumber = Number(duration);
+    if (!durationNumber || !Number.isFinite(durationNumber) || durationNumber <= 0) {
+      return res.status(400).json(error('效期天数必须为大于 0 的数字'));
+    }
+
+    if (categoryId === undefined || categoryId === null || categoryId === '') {
+      return res.status(400).json(error('分组不能为空'));
+    }
+
+    const habit = db.updateHabit(id, {
+      title: title.trim(),
+      duration: durationNumber,
+      categoryId: String(categoryId)
+    });
+
+    if (!habit) {
+      return res.status(404).json(error('事项不存在'));
+    }
+
+    res.json(success(habit, '更新事项成功'));
+  } catch (err) {
+    console.error('更新事项失败', err);
+    res.status(500).json(error('更新事项失败'));
   }
 });
 
@@ -299,12 +346,12 @@ app.delete('/api/habits/:id', (req, res) => {
     const { id } = req.params;
     const deleted = db.deleteHabit(id);
     if (!deleted) {
-      return res.status(404).json({ message: '事项不存在' });
+      return res.status(404).json(error('事项不存在'));
     }
-    res.status(204).send();
-  } catch (error) {
-    console.error('删除事项失败', error);
-    res.status(500).json({ message: '删除事项失败' });
+    res.json(success(null, '删除事项成功'));
+  } catch (err) {
+    console.error('删除事项失败', err);
+    res.status(500).json(error('删除事项失败'));
   }
 });
 
@@ -325,10 +372,10 @@ app.get('/api/email-rules', (req, res) => {
         type: 'expiring_soon'
       }
     ];
-    res.json({ rules });
-  } catch (error) {
-    console.error('获取发送规则失败', error);
-    res.status(500).json({ message: '获取发送规则失败' });
+    res.json(success(rules, '获取发送规则成功'));
+  } catch (err) {
+    console.error('获取发送规则失败', err);
+    res.status(500).json(error('获取发送规则失败'));
   }
 });
 

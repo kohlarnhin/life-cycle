@@ -330,6 +330,36 @@ function deleteHabit(id) {
   return info.changes > 0;
 }
 
+function updateHabit(id, { title, duration, categoryId }) {
+  const existing = db
+    .prepare('SELECT start_date FROM habits WHERE id = ?')
+    .get(id);
+
+  if (!existing) {
+    return null;
+  }
+
+  const newExpireDate = addDays(existing.start_date, duration);
+
+  const info = db
+    .prepare(
+      'UPDATE habits SET title = ?, duration = ?, expire_date = ?, category_id = ? WHERE id = ?'
+    )
+    .run(title, duration, newExpireDate, categoryId, id);
+
+  if (info.changes === 0) {
+    return null;
+  }
+
+  const habit = db
+    .prepare(
+      'SELECT id, title, duration, start_date AS startDate, category_id AS categoryId FROM habits WHERE id = ?'
+    )
+    .get(id);
+
+  return habit;
+}
+
 // 邮件配置
 function getEmailSettings() {
   const row = db
@@ -374,6 +404,7 @@ module.exports = {
   createHabit,
   resetHabitStartDate,
   deleteHabit,
+  updateHabit,
   getEmailSettings,
   saveEmailSettings
 };

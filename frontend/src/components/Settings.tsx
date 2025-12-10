@@ -1,116 +1,140 @@
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Label } from './ui/label';
-import { Eye, EyeOff, Mail, Clock } from 'lucide-react';
+import { Eye, EyeOff, Send, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
-interface EmailConfig {
-  smtpHost: string;
-  smtpPort: string;
-  smtpUser: string;
-  smtpPassword: string;
-  fromEmail: string;
-  toEmail: string;
+interface ApiResponse<T> {
+  code: number;
+  message: string;
+  data: T;
+}
+
+interface EmailSettings {
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string;
+  pass: string;
+  fromAddr: string;
+  toAddr: string;
 }
 
 const API_BASE_URL = '/api';
 
 export function Settings() {
   const [smtpConfig, setSmtpConfig] = useState({
-    server: 'smtp.qq.com',
+    host: '',
     port: '587',
-    username: '',
-    password: '',
-    fromEmail: '',
-    toEmail: '',
+    user: '',
+    pass: '',
+    fromAddr: '',
+    toAddr: '',
   });
 
   const [showPassword, setShowPassword] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [showRules, setShowRules] = useState(false);
-  const [rules, setRules] = useState<any[]>([]);
-  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isTesting, setIsTesting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
+  // 从后端加载邮件配置
   useEffect(() => {
-    // 从后端加载配置
-    fetchConfig();
-  }, []);
-
-  const fetchConfig = async () => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/email-config`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.host) {
+    const fetchEmailConfig = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/email-config`);
+        const result: ApiResponse<EmailSettings> = await res.json();
+        
+        if (result.code === 0 && result.data) {
+          const data = result.data;
           setSmtpConfig({
-            server: data.host || '',
-            port: String(data.port || '587'),
-            username: data.user || '',
-            password: data.pass || '',
-            fromEmail: data.fromAddr || '',
-            toEmail: data.toAddr || '',
+            host: data.host || '',
+            port: String(data.port || 587),
+            user: data.user || '',
+            pass: data.pass || '',
+            fromAddr: data.fromAddr || '',
+            toAddr: data.toAddr || '',
           });
         }
+      } catch (err) {
+        console.error('加载邮件配置失败', err);
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error('加载邮件配置失败', error);
-    }
-  };
+    };
 
+    fetchEmailConfig();
+  }, []);
+
+  // 保存配置到后端
   const handleSave = async () => {
+    if (!smtpConfig.host || !smtpConfig.port || !smtpConfig.fromAddr || !smtpConfig.toAddr) {
+      toast.error('请填写完整的配置信息');
+      return;
+    }
+
     setIsSaving(true);
-    setSaveMessage(null);
-    
     try {
       const res = await fetch(`${API_BASE_URL}/email-config`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          host: smtpConfig.server,
+          host: smtpConfig.host,
           port: parseInt(smtpConfig.port, 10),
           secure: parseInt(smtpConfig.port, 10) === 465,
-          user: smtpConfig.username,
-          pass: smtpConfig.password,
-          fromAddr: smtpConfig.fromEmail,
-          toAddr: smtpConfig.toEmail,
+          user: smtpConfig.user,
+          pass: smtpConfig.pass,
+          fromAddr: smtpConfig.fromAddr,
+          toAddr: smtpConfig.toAddr,
         }),
       });
 
-      if (res.ok) {
-        setSaveMessage({ type: 'success', text: '配置保存成功！' });
-        setTimeout(() => setSaveMessage(null), 2000);
+      const result: ApiResponse<EmailSettings> = await res.json();
+      
+      if (result.code === 0) {
+        toast.success('配置保存成功');
       } else {
-        const error = await res.json();
-        setSaveMessage({ type: 'error', text: error.message || '保存失败' });
+        toast.error(result.message || '保存失败');
       }
-    } catch (error) {
-      console.error('保存配置失败', error);
-      setSaveMessage({ type: 'error', text: '保存失败，请检查网络连接' });
+    } catch (err) {
+      console.error('保存邮件配置失败', err);
+      toast.error('保存失败');
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleViewRules = async () => {
-    if (showRules) {
-      setShowRules(false);
-      return;
-    }
-
+  // 发送测试邮件
+  const handleTestEmail = async () => {
+    setIsTesting(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/email-rules`);
-      if (res.ok) {
-        const data = await res.json();
-        setRules(data.rules || []);
-        setShowRules(true);
+      const res = await fetch(`${API_BASE_URL}/email-test`, {
+        method: 'POST',
+      });
+
+      const result: ApiResponse<{ count: number }> = await res.json();
+      
+      if (result.code === 0) {
+        toast.success(result.message || '测试邮件已发送');
+      } else {
+        toast.error(result.message || '发送失败');
       }
-    } catch (error) {
-      console.error('获取发送规则失败', error);
+    } catch (err) {
+      console.error('发送测试邮件失败', err);
+      toast.error('发送失败');
+    } finally {
+      setIsTesting(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="px-6 py-8 max-w-2xl mx-auto flex items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+      </div>
+    );
+  }
 
   return (
     <div className="px-6 py-8 max-w-2xl mx-auto">
@@ -125,10 +149,10 @@ export function Settings() {
             <Input
               id="smtpHost"
               type="text"
-              placeholder="smtp.qq.com"
-              value={smtpConfig.server}
-              onChange={(e) => setSmtpConfig({ ...smtpConfig, server: e.target.value })}
-              className="mt-2 h-12 rounded-xl border-gray-200"
+              placeholder="例如：smtp.gmail.com"
+              value={smtpConfig.host}
+              onChange={(e) => setSmtpConfig({ ...smtpConfig, host: e.target.value })}
+              className="mt-2 h-12 rounded-xl border-gray-200 focus:border-gray-400"
             />
           </div>
 
@@ -140,8 +164,9 @@ export function Settings() {
               placeholder="587"
               value={smtpConfig.port}
               onChange={(e) => setSmtpConfig({ ...smtpConfig, port: e.target.value })}
-              className="mt-2 h-12 rounded-xl border-gray-200"
+              className="mt-2 h-12 rounded-xl border-gray-200 focus:border-gray-400"
             />
+            <p className="text-xs text-gray-400 mt-1">常用端口: 587 (TLS) / 465 (SSL) / 25</p>
           </div>
 
           <div>
@@ -149,23 +174,23 @@ export function Settings() {
             <Input
               id="smtpUser"
               type="text"
-              placeholder="your-email@qq.com"
-              value={smtpConfig.username}
-              onChange={(e) => setSmtpConfig({ ...smtpConfig, username: e.target.value })}
-              className="mt-2 h-12 rounded-xl border-gray-200"
+              placeholder="your-email@example.com"
+              value={smtpConfig.user}
+              onChange={(e) => setSmtpConfig({ ...smtpConfig, user: e.target.value })}
+              className="mt-2 h-12 rounded-xl border-gray-200 focus:border-gray-400"
             />
           </div>
 
           <div>
-            <Label htmlFor="smtpPassword" className="text-gray-700">SMTP 授权码</Label>
+            <Label htmlFor="smtpPassword" className="text-gray-700">SMTP 密码</Label>
             <div className="relative mt-2">
               <Input
                 id="smtpPassword"
                 type={showPassword ? 'text' : 'password'}
-                placeholder="16位授权码"
-                value={smtpConfig.password}
-                onChange={(e) => setSmtpConfig({ ...smtpConfig, password: e.target.value })}
-                className="h-12 rounded-xl border-gray-200 pr-12"
+                placeholder="••••••••"
+                value={smtpConfig.pass}
+                onChange={(e) => setSmtpConfig({ ...smtpConfig, pass: e.target.value })}
+                className="h-12 rounded-xl border-gray-200 focus:border-gray-400 pr-12"
               />
               <button
                 type="button"
@@ -186,10 +211,10 @@ export function Settings() {
             <Input
               id="fromEmail"
               type="email"
-              placeholder="sender@qq.com"
-              value={smtpConfig.fromEmail}
-              onChange={(e) => setSmtpConfig({ ...smtpConfig, fromEmail: e.target.value })}
-              className="mt-2 h-12 rounded-xl border-gray-200"
+              placeholder="sender@example.com"
+              value={smtpConfig.fromAddr}
+              onChange={(e) => setSmtpConfig({ ...smtpConfig, fromAddr: e.target.value })}
+              className="mt-2 h-12 rounded-xl border-gray-200 focus:border-gray-400"
             />
           </div>
 
@@ -198,110 +223,53 @@ export function Settings() {
             <Input
               id="toEmail"
               type="email"
-              placeholder="receiver@qq.com"
-              value={smtpConfig.toEmail}
-              onChange={(e) => setSmtpConfig({ ...smtpConfig, toEmail: e.target.value })}
-              className="mt-2 h-12 rounded-xl border-gray-200"
+              placeholder="receiver@example.com"
+              value={smtpConfig.toAddr}
+              onChange={(e) => setSmtpConfig({ ...smtpConfig, toAddr: e.target.value })}
+              className="mt-2 h-12 rounded-xl border-gray-200 focus:border-gray-400"
             />
           </div>
         </div>
 
-        {/* 保存结果消息 */}
-        {saveMessage && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={`rounded-xl p-4 border ${
-              saveMessage.type === 'success'
-                ? 'bg-green-50 border-green-100'
-                : 'bg-red-50 border-red-100'
-            }`}
-          >
-            <p className={`font-medium ${
-              saveMessage.type === 'success'
-                ? 'text-green-800'
-                : 'text-red-800'
-            }`}>
-              {saveMessage.type === 'success' ? '✓ ' : '✗ '}
-              {saveMessage.text}
-            </p>
-          </motion.div>
-        )}
-
-        {/* 按钮组 */}
-        <div className="pt-4 flex gap-3 relative">
+        <div className="flex gap-3 pt-4">
           <motion.div whileTap={{ scale: 0.98 }} className="flex-1">
-          <Button
-            onClick={handleSave}
+            <Button
+              onClick={handleSave}
               disabled={isSaving}
-              className="w-full h-12 rounded-xl bg-gray-900 hover:bg-gray-800 text-white disabled:bg-gray-400"
+              className="w-full h-12 rounded-xl bg-gray-900 hover:bg-gray-800 text-white"
             >
-              {isSaving ? '保存中...' : '保存配置'}
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  保存中...
+                </>
+              ) : (
+                '保存配置'
+              )}
             </Button>
           </motion.div>
-
-          <div className="relative">
-            <motion.div whileTap={{ scale: 0.98 }}>
-              <Button
-                onClick={handleViewRules}
-                variant="outline"
-                className="h-12 px-4 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 flex items-center justify-center gap-2"
-              >
-                <Clock className="w-4 h-4" />
-                发送规则
-          </Button>
-        </motion.div>
-
-            {/* 规则气泡弹窗 */}
-            <AnimatePresence>
-              {showRules && (
-                <>
-                  {/* 遮罩层 */}
-                  <div
-                    onClick={() => setShowRules(false)}
-                    className="fixed inset-0 z-40"
-                  />
-                  
-                  {/* 气泡内容 - 在按钮上方 */}
-                  <motion.div
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 5 }}
-                    transition={{ duration: 0.2 }}
-                    className="absolute right-0 bg-white rounded-xl shadow-lg border border-gray-200 z-50"
-                    style={{ width: '280px', bottom: 'calc(100% + 12px)' }}
-                  >
-                    {/* 小三角 - 指向按钮 */}
-                    <div className="absolute left-auto right-6 w-3 h-3 bg-white border-r border-b border-gray-200 transform rotate-45" style={{ bottom: '-1.5px' }}></div>
-                    
-                    <div className="p-4">
-                      {rules.map((rule, index) => (
-                        <div
-                          key={index}
-                          className={`${index !== 0 ? 'mt-3 pt-3 border-t border-gray-100' : ''}`}
-                        >
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-gray-800 font-medium text-sm">{rule.name}</span>
-                            <div className="flex items-center gap-1 text-gray-500 text-xs">
-                              <Clock className="w-3 h-3" />
-                              <span>{rule.schedule}</span>
-                            </div>
-                          </div>
-                          <p className="text-gray-600 text-xs">{rule.description}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </motion.div>
-                </>
+          
+          <motion.div whileTap={{ scale: 0.98 }}>
+            <Button
+              onClick={handleTestEmail}
+              disabled={isTesting}
+              variant="outline"
+              className="h-12 px-6 rounded-xl border-gray-200 hover:bg-gray-50"
+            >
+              {isTesting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
               )}
-            </AnimatePresence>
-          </div>
+            </Button>
+          </motion.div>
         </div>
 
-        <div className="bg-blue-50 rounded-xl p-4 border border-blue-100 mt-4">
-          <p className="text-blue-800">💡 提示</p>
-          <p className="text-blue-600 mt-1">
-            配置完成后，系统将在物品即将过期时自动发送邮件提醒。
+        <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+          <p className="text-blue-800 font-medium">💡 提示</p>
+          <p className="text-blue-600 mt-1 text-sm">
+            配置完成后，系统将在每天 00:10 发送已过期提醒，23:50 发送即将过期提醒（≤3天）。
+            点击发送按钮可测试当前配置是否正确。
           </p>
         </div>
       </motion.div>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { RotateCcw, Trash2, AlertTriangle, AlertCircle, Clock } from 'lucide-react';
-import { motion } from 'motion/react';
+import { RotateCcw, Trash2, AlertTriangle, AlertCircle, Clock, X, Check, Edit3 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Button } from './ui/button';
 
 interface Habit {
@@ -14,11 +14,15 @@ interface HabitCardProps {
   habit: Habit;
   onReset: (id: number) => void;
   onDelete: (id: number) => void;
+  onEdit: (id: number) => void;
   index: number;
 }
 
-export function HabitCard({ habit, onReset, onDelete, index }: HabitCardProps) {
+export function HabitCard({ habit, onReset, onDelete, onEdit, index }: HabitCardProps) {
   const [isPressed, setIsPressed] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showQuickActions, setShowQuickActions] = useState(false);
+  const [pressTimer, setPressTimer] = useState<NodeJS.Timeout | null>(null);
   
   // 计算进度与剩余/过期天数（以天为单位）
   const now = new Date();
@@ -98,7 +102,6 @@ export function HabitCard({ habit, onReset, onDelete, index }: HabitCardProps) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.1 }}
-      whileTap={{ scale: 0.97 }}
       className="relative"
     >
       <div className="bg-white rounded-3xl p-4 border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-300 flex flex-col h-[160px]">
@@ -172,24 +175,73 @@ export function HabitCard({ habit, onReset, onDelete, index }: HabitCardProps) {
           </div>
         </div>
 
-        {/* Action Buttons - 固定在底部 */}
-        <div className="flex gap-2 pt-2.5 border-t border-gray-100">
-          <Button
-            onClick={() => onReset(habit.id)}
-            variant="ghost"
-            size="sm"
-            className="flex-1 h-8 rounded-xl hover:bg-gray-50 text-gray-600 flex items-center justify-center"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            onClick={() => onDelete(habit.id)}
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8 rounded-xl hover:bg-red-50 text-gray-400 hover:text-red-500 p-0 flex items-center justify-center"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
+        {/* Action Buttons - 固定在底部，根据状态切换显示 */}
+        <div className="pt-2.5 border-t border-gray-100">
+          <AnimatePresence mode="wait">
+            {!showDeleteConfirm ? (
+              <motion.div
+                key="actions"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="flex gap-2"
+              >
+                <Button
+                  onClick={() => onEdit(habit.id)}
+                  variant="ghost"
+                  size="sm"
+                  className="flex-1 h-8 rounded-xl hover:bg-gray-50 text-gray-600 flex items-center justify-center"
+                >
+                  <Edit3 className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  onClick={() => onReset(habit.id)}
+                  variant="ghost"
+                  size="sm"
+                  className="flex-1 h-8 rounded-xl hover:bg-gray-50 text-gray-600 flex items-center justify-center"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  variant="ghost"
+                  size="sm"
+                  className="flex-1 h-8 rounded-xl hover:bg-red-50 text-gray-400 hover:text-red-500 flex items-center justify-center"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="confirm"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="flex gap-2"
+              >
+                <Button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  variant="ghost"
+                  size="sm"
+                  className="flex-1 h-8 rounded-xl hover:bg-gray-50 text-gray-600 flex items-center justify-center"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  onClick={() => {
+                    onDelete(habit.id);
+                    setShowDeleteConfirm(false);
+                  }}
+                  size="sm"
+                  className="flex-1 h-8 rounded-xl bg-red-500 hover:bg-red-600 text-white flex items-center justify-center"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                </Button>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </motion.div>

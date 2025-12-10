@@ -33,8 +33,7 @@ Thumbs.db
 *.cankao_backup
 
 # Process IDs
-.backend.pid
-.frontend.pid
+*.pid
 
 # Logs
 logs/
